@@ -90,3 +90,26 @@ where
 	bp_diastolic > (select min(bp_diastolic) from general_hospital.vitals)
 	and bp_systolic < (select max(bp_systolic) from general_hospital.vitals)
 ;
+
+/* Filter our patients table to take a look at patients who have had surgeries */
+select *
+from general_hospital.patients 
+where master_patient_id in (
+	select distinct master_patient_id from general_hospital.surgical_encounters
+)
+order by master_patient_id;
+
+/* To look at patients who have not had surgery just add "not" before in */
+select *
+from general_hospital.patients 
+where master_patient_id not in (
+	select distinct master_patient_id from general_hospital.surgical_encounters
+)
+order by master_patient_id;
+
+/* Another way to wright this with inner join */
+select distinct p.master_patient_id
+from general_hospital.patients p
+inner join general_hospital.surgical_encounters s
+	on p.master_patient_id = s.master_patient_id
+order by p.master_patient_id;
