@@ -65,3 +65,28 @@ inner join county_patients p on
 group by p.county;
 
 
+
+/* Look at surgeries where the total cost is greater than the
+average total cost */ 
+
+with total_cost as (
+	select 
+		surgery_id,
+		sum(resource_cost) as total_surgery_cost
+	from general_hospital.surgical_costs
+	group by surgery_id
+	)
+select *
+from total_cost
+where total_surgery_cost > (
+	select avg(total_surgery_cost)
+	from total_cost
+);
+
+
+select * 
+from general_hospital.vitals
+where 
+	bp_diastolic > (select min(bp_diastolic) from general_hospital.vitals)
+	and bp_systolic < (select max(bp_systolic) from general_hospital.vitals)
+;
