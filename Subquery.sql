@@ -113,3 +113,92 @@ from general_hospital.patients p
 inner join general_hospital.surgical_encounters s
 	on p.master_patient_id = s.master_patient_id
 order by p.master_patient_id;
+
+/* Surgical procedures whose total profit is greater than the 
+average cost for all diagnoses */ 
+select *
+from general_hospital.surgical_encounters
+where total_profit > all(
+	select avg(total_cost)
+	from general_hospital.surgical_encounters
+	group by diagnosis_description
+	);
+
+/* Diagnoses whose average length of stay is less than or equal to
+the length of stay for all encounters by department */
+select 
+	diagnosis_description, 
+	avg(surgical_discharge_date - surgical_admission_date)
+		as length_of_stay
+from general_hospital.surgical_encounters
+group by diagnosis_description
+having avg(surgical_discharge_date - surgical_admission_date) <=
+	all(
+		select 
+			avg(extract(day from patient_discharge_datetime - patient_admission_datetime))
+		from general_hospital.encounters
+		group by department_id
+	);
+
+
+/* Units who saw all tipes of surgical cases or all types of surgical types, as the column is called */ 
+select 
+	unit_name,
+	string_agg(distinct surgical_type, ',') as case_types
+from general_hospital.surgical_encounters
+group by unit_name
+having string_agg (distinct surgical_type, ',') like all (
+	select string_agg (distinct surgical_type, ',')
+	from general_hospital.surgical_encounters
+);
+
+/* get all encounters with an order or all encounters with at least one order */ 
+select e.*
+from general_hospital.encounters e
+where exists(
+	select 1
+	from general_hospital.orders_procedures o 
+	where e.patient_encounter_id = o.patient_encounter_id
+);
+
+
+/* All patient who have not had surgery */
+select p.*
+from general_hospital.patients p
+where not exists(
+	select 1
+	from general_hospital.surgical_encounters s
+	where s.master_patient_id = p.master_patient_id
+);
+
+
+/* Recursive, Fibonacci sequence */
+with recursive fibonacci as (
+	select 1 as a, 1 as b
+	union all 
+	select b, a+b
+	from fibonacci
+)
+select a, b
+from fibonacci 
+limit 15;
+
+/* ---- */ 
+with recursive orders as (
+	select 
+		order_procedure_id,
+		order_parent_order_id,
+		0 as level
+	from general_hospital.orders_procedures
+	where order_parent_order_id is null
+	union all
+	select
+		op.order_procedure_id,
+		op.order_parent_order_id,
+		o.level + 1 as level 
+	from general_hospital.orders_procedures op 
+	inner join orders o on op.order_parent_order_id = o.order_procedure_id	
+)
+select *
+from orders;
+
