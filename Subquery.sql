@@ -202,3 +202,76 @@ with recursive orders as (
 select *
 from orders;
 
+/* The average number of orders per encounter by provider/physician */
+with provider_encounters as(
+	select
+		ordering_provider_id, 
+		patient_encounter_id,
+		count(order_procedure_id) as num_procedures
+	from general_hospital.orders_procedures
+	group by ordering_provider_id, patient_encounter_id
+	),
+	provider_orders as (
+	select
+		ordering_provider_id,
+		avg(num_procedures) as avg_num_procedures
+	from provider_encounters
+	group by ordering_provider_id
+	)
+select 
+	p.full_name,
+	o.avg_num_procedures
+from general_hospital.physicians p 
+left outer join provider_orders o
+	on p.id = o.ordering_provider_id
+where o.avg_num_procedures is not null
+order by o.avg_num_procedures desc;
+
+/* Encounters with any of the top 10 most common order codes */
+select distinct patient_encounter_id
+from general_hospital.orders_procedures
+where order_cd in (
+	select order_cd
+	from general_hospital.orders_procedures
+	group by order_cd
+	order by count(*) desc
+	limit 10
+);
+
+/*Accounts with a total account balance over 10.000 and at least one ICU encounter */
+select a.account_id, a.total_account_balance
+from general_hospital.accounts a
+where 
+	total_account_balance > 10000
+	and exists(
+		select 1
+		from general_hospital.encounters e
+		where e.hospital_account_id = a.account_id
+			and patient_in_icu_flag = 'Yes'
+	);
+
+/*Encouters for patients bor on or after 1995-01-01 whose lengh og stay is greater than or equea to the
+average surgical length of stay for patients 65 or alder */
+with old_los as(
+	select
+		extract(year from age(now(), p.date_of_birth)) as age,
+		avg(s.surgical_discharge_date - s.surgical_admission_date) as avg_los
+	from general_hospital.patients p 
+	inner join general_hospital.surgical_encounters s
+		on p.master_patient_id = s.master_patient_id
+	where
+		p.date_of_birth is not null 
+		and extract (year from age(now(), p.date_of_birth)) >= 65
+	group by extract (year from age (now(), p.date_of_birth))
+	)
+select e.*
+from general_hospital.encounters e
+inner join general_hospital.patients p 
+	on e.master_patient_id = p.master_patient_id
+	and p.date_of_birth >= '1995-01-01'
+where 
+	extract (days from (e.patient_discharge_datetime - e.patient_admission_datetime))
+	>= all(
+	select avg_los
+	from old_los
+	);
