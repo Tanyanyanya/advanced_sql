@@ -37,3 +37,21 @@ left outer join general_hospital.physicians p
 	on s.surgeon_id = p.id
 window w as (partition by s.surgeon_id);
 
+
+/* Rank of the surgical cost by surgeon and then the ROE number 
+of profitability by surgeon and diagnoses*/
+select 
+	s.surgery_id,
+	p.full_name,
+	s.total_cost,
+	rank() over (partition by surgeon_id order by total_cost asc
+		as cost_rank,
+	diagnosis_description,
+	total_profit,
+	row_number() over
+		(partition by surgeon_id, diagnosis_description
+		order by total_profit desc) profit_row_num
+from general_hospital.surgical_encounters s
+left outer join physicians p
+	on s.surgeon_id = p.id
+order by s.surgeon_id, s.diagnosis_description;
